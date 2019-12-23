@@ -1,0 +1,185 @@
+#+ Nivel más ancho
+
+* Definiciones
+
+  Partamos de que tenemos un árbol binario. Definiremos los niveles del árbol:
+  - El nivel 0 está conformado por la raíz.
+  - El nivel 1 está conformado por los hijos de la raíz.
+  - El nivel 2 está conformado por los hijos de los hijos de la raíz.
+  - Y así sucesivamente.
+
+  Definiremos el ancho de un nivel como el número de nodos que conforman dicho nivel. En el ejemplo:
+  - El nivel 0 tiene ancho 1.
+  - El nivel 1 tiene ancho 2.
+  - El nivel 2 tiene ancho 3.
+  - El nivel 3 tiene ancho 2.
+  - Los niveles 4 en adelante tienen ancho 0.
+
+* Planteamiento del problema
+
+  Nuestro objetivo es encontrar el nivel más ancho de un árbol binario. Nuestra estrategia será
+  analizar el árbol un nivel a la vez. Cuando analicemos un nivel, calcularemos:
+  - El ancho de dicho nivel.
+  - Los nodos que conforman el siguiente nivel.
+
+* Estructuras de datos
+
+  Definiremos la estructura de árbol binario:
+
+  #+BEGIN_SRC c
+  struct tree {
+       struct tree *left;
+       struct tree *right;
+  };
+  #+END_SRC
+
+  Definiremos una estructura de datos para almacenar los nodos de un nivel. Podemos usar un arreglo
+  dinámico o una lista enlazada. Utilizaremos una lista enlazada:
+
+  #+BEGIN_SRC c
+  struct stack {
+       struct tree *current;
+       struct stack *next;
+  };
+  #+END_SRC
+
+  Definiremos rutinas para manipular esta lista enlazada como una pila:
+
+  #+BEGIN_SRC c
+  void push(struct tree *tree, struct stack **stack)
+  {
+       struct stack *new = malloc(sizeof (struct stack));
+       new->current = tree;
+       new->next = *stack;
+       *stack = new;
+  }
+  
+  void pop(struct tree **tree, struct stack **stack)
+  {
+       struct stack *old = *stack;
+       *tree = old->current;
+       *stack = old->next;
+       free(old);
+  }
+  #+END_SRC
+
+* Rutina principal
+
+  La rutina principal tiene tres parámetros:
+  - Un parámetro de salida para el nivel más ancho.
+  - Un parámetro de salida para el ancho del nivel más ancho.
+  - Un parámetro de entrada para la raíz del árbol.
+
+  #+BEGIN_SRC c
+  void widest(int *depth, int *width, struct tree *tree)
+  {
+  #+END_SRC
+
+  Necesitamos las siguientes variables:
+  - Una pila para los nodos del nivel actual.
+  - Una pila para los nodos del siguiente nivel.
+
+  #+BEGIN_SRC c
+       struct stack *current = NULL;
+       struct stack *next = NULL;
+  #+END_SRC
+
+  Iteraremos los niveles del árbol en orden, partiendo del nivel 0. Terminaremos cuando lleguemos a
+  un nivel vacío, ya que a partir de entonces el árbol no tiene más nodos.
+
+  #+BEGIN_SRC c
+       push(tree, &current);
+       
+       for (int level = 0; current; level++) {
+  #+END_SRC
+
+  Contaremos los nodos del nivel actual y apilaremos sus hijos en la pila del nivel siguiente.
+
+  #+BEGIN_SRC c
+            int count = 0;
+            
+            while (current) {
+                 pop(&tree, &current);
+                 push(tree->left, &next);
+                 push(tree->right, &next);
+                 count++;
+            }
+  #+END_SRC
+
+  Este programa tiene un desperfecto, a saber: potencialmente estamos apilando NULLs. Para nuestros
+  fines, es necesario que las pilas sólo contengan punteros a nodos válidos. Modificaremos la rutina
+  que apila un nodo para que, si el puntero es NULL, no apile nada.
+
+  #+BEGIN_SRC c
+  void push(struct tree *tree, struct stack **stack)
+  {
+       if (!tree) return;
+       
+       struct stack *new = malloc(sizeof (struct stack));
+       new->current = tree;
+       new->next = *stack;
+       *stack = new;
+  }
+  #+END_SRC
+
+  Volvamos a la rutina principal. Cuando termina el bucle interno, el contador tiene el número de
+  nodos en el nivel actual.
+
+  #+BEGIN_SRC c
+            if (count > *width) {
+                 *depth = level;
+                 *width = count;
+            }
+  #+END_SRC
+
+  Finalmente, prepararemos la siguiente iteración:
+  - El siguiente nivel actual es el actual nivel siguiente.
+  - El siguiente nivel siguiente debe volver a comenzar vacío.
+
+  #+BEGIN_SRC c
+            current = next;
+            next = NULL;
+       }
+  }
+  #+END_SRC
+
+* Pruebas
+
+  Para probar que esta rutina funciona correctamente, usaremos nuestro árbol de ejemplo.
+
+  #+BEGIN_SRC c
+  int main()
+  {
+      struct tree nodes[8];
+      int depth, width;
+      
+      nodes[0].left = &nodes[1];
+      nodes[0].right = &nodes[2];
+      
+      nodes[1].left = &nodes[3];
+      nodes[1].right = &nodes[4];
+      
+      nodes[2].left = NULL;
+      nodes[2].right = &nodes[5];
+      
+      nodes[3].left = NULL;
+      nodes[3].right = &nodes[6];
+      
+      nodes[4].left = NULL;
+      nodes[4].right = NULL;
+      
+      nodes[5].left = &nodes[7];
+      nodes[5].right = NULL;
+      
+      nodes[6].left = NULL;
+      nodes[6].right = NULL;
+      
+      nodes[7].left = NULL;
+      nodes[7].right = NULL;
+      
+      widest(&depth, &width, &nodes[0]);
+      printf("The widest level is %d with %d nodes.\n", depth, width);
+  }
+  #+END_SRC
+
+  Esto concluye la presentación.

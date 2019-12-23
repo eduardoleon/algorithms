@@ -1,0 +1,243 @@
+#+ Linealización conjunta
+
+* Definiciones
+
+  Hoy día trabajaremos con árboles binarios de búsqueda. Para evitar complicaciones a la hora de
+  programar, empezaremos con un repaso de la teoría de árboles binarios.
+
+  Partamos de que tenemos un árbol binario. Una linealización del árbol es una secuencia conformada
+  por los nodos del árbol en la que cada nodo aparece exactamente una vez. Entonces:
+
+  + Si el árbol es vacío, la única linealización posible es la secuencia vacía.
+
+  + Si el árbol es no vacío, por inducción estructural, tenemos:
+    - Una secuencia conformada únicamente por el nodo raíz
+    - Una linealización del subárbol izquierdo
+    - Una linealización del subárbol derecho
+
+    Combinando estas tres secuencias, tenemos una linealización del árbol original.
+
+  La manera más simple de combinar secuencias es concatenarlas. En particular:
+
+  + La linealización preorden se obtiene concatenando:
+    - El nodo raíz
+    - La linealización preorden del subárbol izquierdo
+    - La linealización preorden del subarbol derecho
+
+  + La linealización en orden se obtiene concatenando:
+    - La linealización en orden del subárbol izquierdo
+    - El nodo raíz
+    - La linealización en orden del subárbol derecho
+
+  + La linealización postorden se obtiene concatenando:
+    - La linealización postorden del subárbol izquierdo
+    - La linealización postorden del subárbol derecho
+    - El nodo raíz
+
+  Introduzcamos dos nuevos supuestos:
+  - En los nodos del árbol se almacenan elementos de algún tipo, e.g., números enteros.
+  - Existe una relación de orden total sobre el tipo de los elementos, e.g., el orden usual de los
+    números enteros.
+
+  Por abuso de lenguaje, usarmos la palabra "linealización" indistintamente para referirnos a
+  - Una secuencia de nodos de un árbol.
+  - Una secuencia de elementos contenidos en los nodos de un árbol.
+
+  Definiremos un árbol binario de búsqueda como un árbol binario cuya linealización en orden es una
+  secuencia no decreciente con respecto a este orden.
+
+* Planteamiento del problema
+
+  Nuestro objetivo es combinar las linealizaciones en orden de dos árboles binarios de búsqueda en
+  una única secuencia no decreciente que llamaremos linealización conjunta de los dos árboles.
+
+* Estructuras de datos
+
+  Definiremos la estructura de árbol binario:
+
+  #+BEGIN_SRC c
+  struct tree {
+      int value;
+      struct tree *left;
+      struct tree *right;
+  };
+  #+END_SRC
+
+  Definiremos una estructura de datos para almacenar un sufijo de la linealización en orden de un
+  árbol. Utilizaremos una pila que contiene dos tipos de elementos:
+  - Nodos individuales (estado 0)
+  - Subárboles (estado 1)
+
+  #+BEGIN_SRC c
+  struct stack {
+      int state;
+      struct tree *current;
+      struct stack *next;
+  };
+  #+END_SRC
+
+  Definiremos rutinas para manipular una pila ordinaria:
+
+  #+BEGIN_SRC c
+  void push(int state, struct tree *tree, struct stack **stack)
+  {
+       if (!tree) return;
+       
+       struct stack *new = malloc(sizeof (struct stack));
+       new->state = state;
+       new->current = tree;
+       new->next = *stack;
+       *stack = new;
+  }
+  
+  void pop(struct tree **tree, struct stack **stack)
+  {
+       struct stack *old = *stack;
+       *tree = old->current;
+       *stack = old->next;
+       free(old);
+  }
+  #+END_SRC
+
+  Definiremos una rutina que extrae un nodo individual de la pila. Si el elemento en la cima de la
+  pila es un subárbol, reemplazaremos el subárbol por sus partes constituyentes:
+  - El subárbol izquierdo
+  - El nodo raíz
+  - El subárbol derecho
+
+  Recordemos que los elementos de la pila se extraen en el orden inverso en que se insertan. Esto
+  justifica el orden en que reinsertaremos las partes en la pila:
+
+  #+BEGIN_SRC c
+  void pop_inorder(struct tree **tree, struct stack **stack)
+  {
+       while ((*stack)->state) {
+            struct tree *tree;
+            pop(&tree, stack);
+            
+            push(1, tree->right, stack);
+            push(0, tree, stack);
+            push(1, tree->left , stack);
+       }
+       
+       pop(tree, stack);
+  }
+  #+END_SRC
+
+* Rutina principal
+
+  La rutina principal tiene dos parámetros de entrada:
+  - El primer árbol, que llamaremos árbol izquierdo
+  - El segundo árbol, que llamaremos árbol derecho
+
+  #+BEGIN_SRC c
+  void merge(struct tree *ltree, struct tree *rtree)
+  {
+  #+END_SRC
+
+  Necesitamos las siguientes variables:
+  - Una pila para la parte aún no visitada del árbol izquierdo
+  - Una pila para la parte aún no visitada del árbol derecho
+
+  #+BEGIN_SRC c
+       struct stack *lstack = NULL;
+       struct stack *rstack = NULL;
+       push(1, ltree, &lstack);
+       push(1, rtree, &rstack);
+  #+END_SRC
+
+  Mientras queden nodos por visitar en ambos árboles, extraeremos el primer nodo no visitado de la
+  linealización de cada árbol:
+
+  #+BEGIN_SRC c
+       while (lstack && rstack) {
+            pop_inorder(&ltree, &lstack);
+            pop_inorder(&rtree, &rstack);
+  #+END_SRC
+
+  El menor de los elementos extraídos es el siguiente elemento de la linealización conjunta. El otro
+  elemento regresará a la pila de donde provino:
+
+  #+BEGIN_SRC c
+            if (ltree->value <= rtree->value) {
+                 printf("%d ", ltree->value);
+                 push(0, rtree, &rstack);
+            }
+            else {
+                 printf("%d ", rtree->value);
+                 push(0, ltree, &lstack);
+            }
+       }
+  #+END_SRC
+
+  Cuando termina este bucle, sabemos con certeza que por lo menos un árbol está vacío. Entonces el
+  resto de la linealización conjunta es la linealización del otro árbol:
+
+  #+BEGIN_SRC c
+       while (lstack) {
+            pop_inorder(&ltree, &lstack);
+            printf("%d ", ltree->value);
+       }
+       
+       while (rstack) {
+            pop_inorder(&rtree, &rstack);
+            printf("%d ", rtree->value);
+       }
+  #+END_SRC
+
+* Pruebas
+
+  Definiremos una rutina que crea un árbol de ejemplo, sin inicializar sus elementos:
+
+  #+BEGIN_SRC c
+  void make_tree(struct tree *nodes, int bound)
+  {
+       int half = bound / 2;
+       
+       for (int i = 1; i < half; i++) {
+            nodes[i].left = &nodes[2*i];
+            nodes[i].right = &nodes[2*i + 1];
+       }
+       
+       for (int i = half; i < bound; i++) {
+            nodes[i].left = NULL;
+            nodes[i].right = NULL;
+       }
+  }
+  #+END_SRC
+
+  Definiremos una rutina que inicializa los elementos de un árbol ya creado:
+  
+  #+BEGIN_SRC c
+  void fill_tree(struct tree *tree, int start, int step)
+  {
+       struct stack *stack = NULL;
+       push(1, tree, &stack);
+       
+       while (stack) {
+            pop_inorder(&tree, &stack);
+            tree->value = start;
+            start += step;
+       }
+  }
+  #+END_SRC
+
+  Finalmente, construiremos dos árboles de ejemplo y calcularemos su linealización conjunta:
+
+  #+BEGIN_SRC c
+  int main()
+  {
+       struct tree left[72];
+       struct tree right[54];
+       
+       make_tree(left, 72);
+       make_tree(right, 54);
+       
+       fill_tree(&left[1], 2, 2);
+       fill_tree(&right[1], 3, 2);
+       
+       merge(&left[1], &right[1]);
+  }
+  #+END_SRC
+
+  Esto concluye la presentación.
